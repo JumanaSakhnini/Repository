@@ -1,45 +1,22 @@
 "use client";
-// This tells Next.js this code runs in the browser (not server-side)
 
 import { useState, useEffect } from "react";
-// useState = stores changing values
-// useEffect = runs code automatically when page loads
-
 import { supabase } from "../lib/supabase";
-// This connects your app to Supabase (your database)
 
 export default function Home() {
-
-
   const [task, setTask] = useState("");
-  // Stores what the user types in the input box
-
   const [tasks, setTasks] = useState([]);
-  // Stores all tasks from Supabase
 
-
-  
-  // ADD TASK TO DATABASE
-
-
+  // ADD TASK
   async function addTask() {
-
     if (task === "") return;
-    // Prevent empty tasks
 
-    const { error } = await supabase
-      .from("tasks")
-      // Use the "tasks" table in Supabase
-
-      .insert([
-        {
-          text: task,
-          // Save the task text
-
-          done: false,
-          // New tasks always start as not done
-        },
-      ]);
+    const { error } = await supabase.from("tasks").insert([
+      {
+        text: task,
+        done: false,
+      },
+    ]);
 
     if (error) {
       console.log("Error adding task:", error);
@@ -47,21 +24,12 @@ export default function Home() {
     }
 
     setTask("");
-    // Clear input box after adding
-
     getTasks();
-    // Reload tasks from database so UI updates
   }
 
-
-  // GET TASKS FROM DATABASE
-
+  // GET TASKS
   async function getTasks() {
-
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*");
-      // Get ALL columns from ALL rows
+    const { data, error } = await supabase.from("tasks").select("*");
 
     if (error) {
       console.log("Error fetching tasks:", error);
@@ -69,34 +37,21 @@ export default function Home() {
     }
 
     setTasks(data);
-    // Put database tasks into React state (UI)
   }
 
-``
   // RUN ON PAGE LOAD
-  
-
   useEffect(() => {
     getTasks();
-    // When page opens → load tasks from Supabase
   }, []);
 
-
   // TOGGLE DONE / UNDO
-
-  async function toggleTask(index) {
-
-    const taskToUpdate = tasks[index];
-    // Get the task the user clicked
-
+  async function toggleTask(id, currentDone) {
     const { error } = await supabase
       .from("tasks")
       .update({
-        done: !taskToUpdate.done,
-        // Flip true ↔ false
+        done: !currentDone,
       })
-      .eq("id", taskToUpdate.id);
-      // Only update the row with matching ID
+      .eq("id", id);
 
     if (error) {
       console.log("Error updating task:", error);
@@ -104,11 +59,22 @@ export default function Home() {
     }
 
     getTasks();
-    // Refresh list so UI matches database
   }
 
+  // DELETE TASK
+  async function deleteTask(id) {
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", id);
 
-  // UI (WHAT YOU SEE ON SCREEN)
+    if (error) {
+      console.log("Error deleting task:", error);
+      return;
+    }
+
+    getTasks();
+  }
 
   return (
     <div
@@ -121,15 +87,12 @@ export default function Home() {
         borderRadius: "12px",
       }}
     >
-
       <h1>To Do List</h1>
 
-      {/* INPUT BOX */}
+      {/* INPUT */}
       <input
         value={task}
         onChange={(e) => setTask(e.target.value)}
-        // Every time user types → update "task" state
-
         style={{
           padding: "10px",
           width: "250px",
@@ -144,21 +107,10 @@ export default function Home() {
       </button>
 
       {/* TASK LIST */}
-      <ul
-        style={{
-          listStyle: "none",
-          padding: 0,
-          marginTop: "20px",
-        }}
-      >
-
-        {tasks.map((item, index) => (
-          // Loop through all tasks
-
+      <ul style={{ listStyle: "none", padding: 0, marginTop: "20px" }}>
+        {tasks.map((item) => (
           <li
             key={item.id}
-            // Unique ID from Supabase (important for React)
-
             style={{
               backgroundColor: "#d88aca",
               padding: "10px",
@@ -169,25 +121,36 @@ export default function Home() {
               alignItems: "center",
             }}
           >
-
-            {/* TASK TEXT */}
+            {/* TEXT */}
             <span
               style={{
                 textDecoration: item.done ? "line-through" : "none",
-                // If done → show line through text
               }}
             >
               {item.text}
             </span>
 
-            {/* DONE / UNDO BUTTON */}
-            <button onClick={() => toggleTask(index)}>
-              {item.done ? "Undo" : "Done"}
-            </button>
+            {/* BUTTONS */}
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button onClick={() => toggleTask(item.id, item.done)}>
+                {item.done ? "Undo" : "Done"}
+              </button>
 
+              <button
+                onClick={() => deleteTask(item.id)}
+                style={{
+                  backgroundColor: "red",
+                  color: "white",
+                  border: "none",
+                  padding: "5px 10px",
+                  borderRadius: "5px",
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </li>
         ))}
-
       </ul>
     </div>
   );
