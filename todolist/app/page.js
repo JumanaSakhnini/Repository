@@ -4,32 +4,35 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function Home() {
+  const [user, setUser] = useState(null);
   const [task, setTask] = useState("");
   const [tasks, setTasks] = useState([]);
 
-  // ADD TASK
-  async function addTask() {
-    if (task === "") return;
+  // CHECK IF USER IS LOGGED IN
+  async function checkUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const { error } = await supabase.from("tasks").insert([
-      {
-        text: task,
-        done: false,
-      },
-    ]);
-
-    if (error) {
-      console.log("Error adding task:", error);
+    if (!user) {
+      window.location.href = "/login";
       return;
     }
 
-    setTask("");
-    getTasks();
+    setUser(user);
+    getTasks(user.id);
   }
 
+  useEffect(() => {
+    checkUser();
+  }, []);
+
   // GET TASKS
-  async function getTasks() {
-    const { data, error } = await supabase.from("tasks").select("*");
+  async function getTasks(userId) {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId);
 
     if (error) {
       console.log("Error fetching tasks:", error);
@@ -39,10 +42,26 @@ export default function Home() {
     setTasks(data);
   }
 
-  // RUN ON PAGE LOAD
-  useEffect(() => {
-    getTasks();
-  }, []);
+  // ADD TASK
+  async function addTask() {
+    if (task === "") return;
+
+    const { error } = await supabase.from("tasks").insert([
+      {
+        text: task,
+        done: false,
+        user_id: user.id,
+      },
+    ]);
+
+    if (error) {
+      console.log("Error adding task:", error);
+      return;
+    }
+
+    setTask("");
+    getTasks(user.id);
+  }
 
   // TOGGLE DONE / UNDO
   async function toggleTask(id, currentDone) {
@@ -58,7 +77,7 @@ export default function Home() {
       return;
     }
 
-    getTasks();
+    getTasks(user.id);
   }
 
   // DELETE TASK
@@ -73,85 +92,158 @@ export default function Home() {
       return;
     }
 
-    getTasks();
+    getTasks(user.id);
+  }
+
+  // LOG OUT
+  async function logout() {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
+
+  if (!user) {
+    return <p style={{ textAlign: "center" }}>Loading...</p>;
   }
 
   return (
     <div
       style={{
-        maxWidth: "400px",
-        margin: "50px auto",
-        textAlign: "center",
-        backgroundColor: "#f371a7",
-        padding: "20px",
-        borderRadius: "12px",
+        minHeight: "100vh",
+        backgroundColor: "#ffd6e7",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
       }}
     >
-      <h1>To Do List</h1>
 
-      {/* INPUT */}
-      <input
-        value={task}
-        onChange={(e) => setTask(e.target.value)}
+      {/* White To Do Card */}
+      <div
         style={{
-          padding: "10px",
-          width: "250px",
-          backgroundColor: "#9fc7b5",
-          marginRight: "10px",
+          width: "400px",
+          backgroundColor: "white",
+          padding: "40px",
+          borderRadius: "12px",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+          textAlign: "center",
         }}
-      />
+      >
+        <h1>To Do List</h1>
 
-      {/* ADD BUTTON */}
-      <button onClick={addTask} style={{ padding: "10px 15px" }}>
-        Add
-      </button>
+        <input
+          value={task}
+          onChange={(e) => setTask(e.target.value)}
+          placeholder="Add a task..."
+          style={{
+            padding: "10px",
+            width: "65%",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+          }}
+        />
 
-      {/* TASK LIST */}
-      <ul style={{ listStyle: "none", padding: 0, marginTop: "20px" }}>
-        {tasks.map((item) => (
-          <li
-            key={item.id}
-            style={{
-              backgroundColor: "#d88aca",
-              padding: "10px",
-              marginBottom: "10px",
-              borderRadius: "8px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            {/* TEXT */}
-            <span
+        <button
+          onClick={addTask}
+          style={{
+            padding: "10px 15px",
+            marginLeft: "10px",
+            backgroundColor: "#ff69a6",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
+          Add
+        </button>
+
+
+        <ul
+          style={{
+            listStyle: "none",
+            padding: 0,
+            marginTop: "25px",
+          }}
+        >
+          {tasks.map((item) => (
+            <li
+              key={item.id}
               style={{
-                textDecoration: item.done ? "line-through" : "none",
+                backgroundColor: "#f3a6c8",
+                padding: "10px",
+                marginBottom: "10px",
+                borderRadius: "8px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              {item.text}
-            </span>
 
-            {/* BUTTONS */}
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={() => toggleTask(item.id, item.done)}>
-                {item.done ? "Undo" : "Done"}
-              </button>
-
-              <button
-                onClick={() => deleteTask(item.id)}
+              <span
                 style={{
-                  backgroundColor: "red",
-                  color: "white",
-                  border: "none",
-                  padding: "5px 10px",
-                  borderRadius: "5px",
+                  textDecoration: item.done ? "line-through" : "none",
                 }}
               >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+                {item.text}
+              </span>
+
+
+              <div style={{ display: "flex", gap: "8px" }}>
+
+                <button
+                  onClick={() => toggleTask(item.id, item.done)}
+                  style={{
+                    border: "none",
+                    borderRadius: "5px",
+                    padding: "5px 8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {item.done ? "Undo" : "Done"}
+                </button>
+
+
+                <button
+                  onClick={() => deleteTask(item.id)}
+                  style={{
+                    backgroundColor: "#ff0066",
+                    color: "white",
+                    border: "none",
+                    padding: "5px 10px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Delete
+                </button>
+
+              </div>
+
+            </li>
+          ))}
+        </ul>
+
+      </div>
+
+
+      {/* Logout directly underneath */}
+      <button
+        onClick={logout}
+        style={{
+          marginTop: "20px",
+          width: "400px",
+          padding: "10px",
+          backgroundColor: "#ff62a6",
+          color: "white",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer",
+        }}
+      >
+        Logout
+      </button>
+
+
     </div>
   );
 }
